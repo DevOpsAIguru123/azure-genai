@@ -8,9 +8,8 @@ data "azurerm_key_vault" "example" {
   resource_group_name = "your-resource-group"
 }
 
-# Step 1: Define a map in locals with all 32 keys
+# Step 1: Define a custom map for all keys
 locals {
-  # Custom key map where each custom name (e.g., dbfs_dev_key) points to the actual Key Vault key name (e.g., dbfs-dev)
   key_map = {
     dbfs_dev_key               = "dbfs-dev"
     managed_services_dev_key    = "managed-services-dev"
@@ -32,7 +31,6 @@ locals {
     managed_disk_prod_key       = "managed-disk-prod"
     storage_prod_key            = "storage-prod"
     
-    # Non-prod keys (np)
     dbfs_np_dev_key             = "dbfs-np-dev"
     managed_services_np_dev_key = "managed-services-np-dev"
     managed_disk_np_dev_key     = "managed-disk-np-dev"
@@ -53,27 +51,29 @@ locals {
     managed_disk_np_prod_key    = "managed-disk-np-prod"
     storage_np_prod_key         = "storage-np-prod"
   }
-
-  # Step 2: Use the custom key names from key_map to create a map of Key Vault values
-  key_values = {
-    for custom_key, actual_key in local.key_map :
-    custom_key => data.azurerm_key_vault_key[actual_key].value
-  }
 }
 
-# Step 3: Define a data source for each Key Vault key based on key_map values
-data "azurerm_key_vault_key" "example" {
-  for_each     = toset(values(local.key_map))  # Loop through each actual Key Vault key name
+# Step 2: Create a data block for each key dynamically using for_each
+data "azurerm_key_vault_key" "keys" {
+  for_each     = local.key_map
   name         = each.value
   key_vault_id = data.azurerm_key_vault.example.id
 }
 
-# Step 4: Output to verify the custom key-value map
-output "all_keys_custom_map" {
-  value = local.key_values  # This will show all keys in the custom map format
+# Step 3: Map custom keys to actual values dynamically
+locals {
+  key_values = {
+    for custom_key, actual_key in local.key_map :
+    custom_key => data.azurerm_key_vault_key.keys[custom_key].value
+  }
 }
 
-# Step 5: Example of accessing a specific custom key
+# Step 4: Output to verify the custom map of keys and values
+output "all_keys_custom_map" {
+  value = local.key_values
+}
+
+# Example: Access a specific key
 output "dbfs_dev_key" {
-  value = local.key_values["dbfs_dev_key"]  # Access the value of the dbfs-dev key using custom key
+  value = local.key_values["dbfs_dev_key"]
 }
